@@ -4,7 +4,7 @@
  * 
  * This is an example application of the MIPI RFFE_master class when
  * used in conjunction with the MIPI interface board. This source 
- * code would be uploaded to the onboard microcontroller the necessary
+ * code would be uploaded to the onboard microcontroller. The necessary
  * power and communication signals routed through the BNC connectors
  * to micromanipulators for die level probing.
  *
