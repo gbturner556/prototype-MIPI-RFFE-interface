@@ -1,5 +1,5 @@
 #include "MIPI.h"
-/**
+/**RFFE Constructor
    constructor for RFFE_master
    
    @param slave_address is the slave address for the DUT
@@ -18,9 +18,9 @@ RFFE_master::RFFE_master(byte slave_address, double vio_volt, double vcc_volt){
   this->_ODD_parity  = 1;
   this->_NO_parity   = 2; 
   
-} /* RFFE_master */
+}
 
-/**
+/** Default RFFE constructor
 	the default constructor for the RFFE master
 	vio_volts => 1.8 V	
 	vcc_volts => 1.8 V
@@ -38,7 +38,7 @@ RFFE_master::RFFE_master(){
   this->_ODD_parity  = 1;
   this->_NO_parity   = 2;
    
-} /* RFFE_master */
+}
 
 /**
 	function used to begin connection to the rffe master's peripherals
@@ -46,7 +46,7 @@ RFFE_master::RFFE_master(){
 void RFFE_master::begin(){
 
 //set up i2c pins for RPI (maybe  unecessary idk)
-  i2c_init(i2c_default, 1000 * 1000);
+  i2c_init(i2c_default, 1000000);
   gpio_set_function(PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
   gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
   gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
@@ -91,8 +91,7 @@ void RFFE_master::begin(){
   vio_monitor.begin();
   vio_monitor.configure(INA219::RANGE_16V, INA219::GAIN_1_40MV, INA219::ADC_12BIT, INA219::ADC_12BIT, INA219::CONT_SH_BUS);
   vio_monitor.calibrate(0.1, 0.04, 16, 0.4); 
-	
-} /* begin */
+}
 
 /**
    setter for slave address
@@ -102,7 +101,7 @@ void RFFE_master::begin(){
 */
 void RFFE_master::set_slave(byte slave_address) {
   this->_slave_address = slave_address;
-} /* set_slave */
+} 
 
 
 /**
@@ -118,15 +117,7 @@ void RFFE_master::_bus_park() {
   //wiggle clock
   clk.setValue(_VIO_code);
   clk.setValue(0);
-
-//  /* skyworks bit bang code has 5 clock cycles after bus park for whatever reason */
-//  mcp.setChannelValue(SCLK_CHANNEL, _VIO_code); mcp.setChannelValue(SCLK_CHANNEL, 0);
-//  mcp.setChannelValue(SCLK_CHANNEL, _VIO_code); mcp.setChannelValue(SCLK_CHANNEL, 0);
-//  mcp.setChannelValue(SCLK_CHANNEL, _VIO_code); mcp.setChannelValue(SCLK_CHANNEL, 0);
-//  mcp.setChannelValue(SCLK_CHANNEL, _VIO_code); mcp.setChannelValue(SCLK_CHANNEL, 0);
-//  mcp.setChannelValue(SCLK_CHANNEL, _VIO_code); mcp.setChannelValue(SCLK_CHANNEL, 0);
-
-} /* void RFFE_master::_bus_park */
+}
 
 /**
    used to assert the start of a transmission
@@ -147,6 +138,7 @@ void RFFE_master::_assert_SSC() {
   dat.setValue(_VIO_code);
   dat.setValue(0);
 }
+
 /**
    helper function used to write a bit out using the
    MCP4725 on the front end
@@ -163,8 +155,7 @@ void RFFE_master::_bit_write(byte bit_value) {
   //pulse clock
   clk.setValue(_VIO_code);
   clk.setValue(0);  
-
-} /* void RFFE_master::bit_write */
+}
 
 /**
  * helper function that performs a series of bit writes based on input parameters
@@ -178,28 +169,31 @@ void RFFE_master::_frame_write(word write_value, byte bit_count, byte parity) {
   byte bit_index;
   byte bit_value;
   byte one_count = 0;
-  byte zero_count = 0;
-
+	
+  //opportunities for improvement here by better utilizing bit math
   bit_mask = 1 << (bit_count-1);
   for (bit_index = 0; bit_index < bit_count; bit_index++) {
     if ((write_value & bit_mask) != 0) {
-      this->_bit_write(1); one_count++;
-    } else {
-      this->_bit_write(0); zero_count++; /* for equal time */
-    } /* else */
+      this->_bit_write(1); 
+	  one_count++;	//count for parity
+    } 
+	else {
+      this->_bit_write(0); 	   
+    } 
     write_value = write_value << 1;
-  } /* for */
+  }
+  
   switch (parity) {
-    case 0: /* EVEN_parity */
+    case 0: //even parity
       this->_bit_write( one_count % 2 );
       break;
-    case 1: /* ODD_parity */
-      this->_bit_write( (one_count % 2) ^ 1 ); /* ^ is xor */
+    case 1: //odd parity
+      this->_bit_write( (one_count % 2) ^ 1 );
       break;
-    case 2: /* NO_parity */
+    case 2: //no parity
       break;
-  } /* switch (parity) */
-} /* void RFFE_master::_frame_write */
+  }
+} 
 
 /**
  * helper function used to read a frame of 8 bits from a slave device
@@ -211,9 +205,9 @@ byte RFFE_master::_frame_read() {
   int threshold = _VIO_code/2;
   byte read_value = 0;
   
-  // Frame read - use the ADC on PIN A0 (GP26)
+  // Frame read uses the ADC on PIN A0 (GP26)
   // On board ADC and external DAC are 12 bit using 3.3 Vref
-  // this means HIGH = VIO_code and LOW = 0
+  // HIGH = VIO_code and LOW = 0
   // threshold is VIO_code/2
 
   //put dat channel in high impedance for read back
@@ -236,9 +230,10 @@ byte RFFE_master::_frame_read() {
       read_value = read_value << 1;
     }
     
-  } /* for bit_index */
+  }
   
-  //Send clock for parity bit but ignore */
+  //Send clock for parity bit but ignore 
+  //opportunity to implement parity check here
   clk.setValue(_VIO_code);
   clk.setValue(0);
 
@@ -247,7 +242,7 @@ byte RFFE_master::_frame_read() {
 
   //send back read value
   return read_value;
-} /* int RFFE_master::_frame_read() */
+}
 
 /**
  * helper fucntion that uses the frame write to construct and write a command frame 
@@ -264,7 +259,7 @@ void RFFE_master::_command_frame(byte Slave_address, byte Command, byte Register
 } /* void RFFE_master::_command_frame(byte Slave_address, byte Command, byte Register_address) */
 
 /**
- * helper function that runs through the proccess of writing to a given registersin a slave device
+ * helper function that runs through the proccess of writing to a given register in a slave device
  * 
  * @param Slave_address the address of the intended target device
  * @param Register_address the target register in the intended target device
@@ -368,7 +363,7 @@ float RFFE_master::vcc_current_microamps(){
 } /* vcc_curent_microamps */
 
 /**
- * function to read to current to Vio using INA219 current monitor
+ * function to read current to Vio using INA219 current monitor
  * 
  * @return the current in microamps
  */
@@ -376,7 +371,7 @@ float RFFE_master::vio_current_microamps(){
   float offset_uA = 11.0;	//roughly characterizes the offset introduced by DAC
   return ((this->vio_monitor.shuntVoltage()/SHUNT_ohm * 1000000) - offset_uA);
   //return this->vio_monitor.shuntVoltage()/SHUNT_ohm * 1000000;	//uncomment this line for no offset adjust
-} /* vio_curent_microamps */
+}
 
 /**
 	function used to change the io voltage
@@ -385,7 +380,7 @@ float RFFE_master::vio_current_microamps(){
 void RFFE_master::set_VIO_volts(double vio_volt){
 	this->_VIO_volts = vio_volt;
 	this->_VIO_code = _volts_to_bits(vio_volt);
-}/* set_VIO_volts */
+}
 
 /**
 	function used to change the supply voltage
@@ -394,4 +389,4 @@ void RFFE_master::set_VIO_volts(double vio_volt){
 void RFFE_master::set_VCC_volts(double vcc_volt){
 	this->_VCC_volts = vcc_volt;
 	this->_VCC_code = _volts_to_bits(vcc_volt);
-}/* set_vCC_volts */
+}
